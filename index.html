@@ -25,7 +25,7 @@
                The layout (date left / weekday right / alert below clock)
                is built so nothing overlaps at any value in this range.
                ========================================================= */
-            --scale: 1.2;
+            --scale: 1;
 
             /* clamp() keeps the clock between 250px and 700px no matter
                how large/small you set --scale, so it can never overflow
@@ -46,7 +46,7 @@
             height: 100vh;
             font-family: 'Times New Roman', Times, serif;
             overflow: hidden;
-            cursor: none; /* Hide cursor for screensaver mode */
+            cursor: auto; /* Hide cursor for screensaver mode */
         }
 
         /* Digital Space Background Canvas */
@@ -272,26 +272,6 @@
             pointer-events: none; z-index: 30;
         }
 
-        /* One-time hint telling the viewer to click so the hourly chime can play
-           (browsers block sound until the page has been interacted with) */
-        .audio-hint {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.7rem;
-            letter-spacing: 2px;
-            color: rgba(0, 255, 204, 0.55);
-            z-index: 50;
-            transition: opacity 0.8s ease;
-        }
-
-        .audio-hint.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
         /* ===================== SOUND TOGGLE ===================== */
         .sound-toggle {
             position: fixed;
@@ -405,8 +385,6 @@
         </div>
 
     </div>
-
-    <div class="audio-hint" id="audioHint">CLICK ANYWHERE TO ENABLE CLOCK SOUNDS</div>
 
     <!-- Sound on/off toggle — independent from clock size, which stays CSS-only -->
     <div class="sound-toggle" id="soundToggle" title="Toggle tick-tock and hourly chime">
@@ -620,26 +598,35 @@
 
         function playTickTock() {
             if (!soundEnabled) return; // respect the mute toggle
-            if (!audioCtx) return; // stay silent until the viewer has interacted with the page
             const ctx = getAudioContext();
-            if (ctx.state === 'suspended') return;
+            if (ctx.state === 'suspended') return; // audio not yet allowed by this environment
             playTick(ctx.currentTime, tickIsEven);
             tickIsEven = !tickIsEven;
         }
 
-        // Browsers block audio until the user interacts with the page at least once.
-        // This unlocks the AudioContext on the first click/tap/keypress.
-        function unlockAudioOnce() {
-            getAudioContext();
-            const hint = document.getElementById('audioHint');
-            if (hint) hint.classList.add('hidden');
-            window.removeEventListener('click', unlockAudioOnce);
-            window.removeEventListener('keydown', unlockAudioOnce);
-            window.removeEventListener('touchstart', unlockAudioOnce);
-        }
-        window.addEventListener('click', unlockAudioOnce);
-        window.addEventListener('keydown', unlockAudioOnce);
-        window.addEventListener('touchstart', unlockAudioOnce);
+        // ===================== AUTO-START AUDIO (screensaver-safe) =====================
+        // IMPORTANT: this file runs as a real Windows .scr screensaver, where ANY
+        // mouse click or movement instantly closes the screensaver (a Windows rule,
+        // not something this page can change). So we can NOT wait for a click to
+        // unlock audio like a normal webpage would — by the time a click happens,
+        // the screensaver is already closing.
+        //
+        // Instead, we try to start the AudioContext immediately on load. Most
+        // screensaver-wrapper tools (the program that turns this HTML into a .scr
+        // file) launch it in a way that allows audio right away. If your specific
+        // wrapper still blocks it, see the note below this block.
+        (function autoStartAudio() {
+            try {
+                getAudioContext();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (err) {
+                // Some wrappers may still block audio without any interaction at all.
+                // In that case there is no code-level fix — see the .scr wrapper's
+                // settings for an "allow autoplay audio" / "allow media" option.
+            }
+        })();
 
         // ===================== SOUND TOGGLE GEAR =====================
         const soundToggle = document.getElementById('soundToggle');
@@ -663,10 +650,9 @@
         }
 
         soundToggle.addEventListener('click', (e) => {
-            e.stopPropagation(); // don't let this click also trigger unlockAudioOnce twice
-            getAudioContext(); // also unlocks audio if this is the very first click
-            const hint = document.getElementById('audioHint');
-            if (hint) hint.classList.add('hidden');
+            e.stopPropagation();
+            const ctx = getAudioContext();
+            if (ctx.state === 'suspended') ctx.resume(); // in case this click is what finally allows audio
 
             soundEnabled = !soundEnabled;
             localStorage.setItem('edc_clock_sound', soundEnabled ? 'on' : 'off');
