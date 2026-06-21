@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDC Office Screensaver</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            /* =========================================================
+               CLOCK SIZE CONTROL — edit this one number to resize everything
+               =========================================================
+               1   = default size (100%)
+               1.2 = 20% bigger
+               0.8 = 20% smaller
+               Safe range: 0.6 to 1.4 on a normal monitor.
+               The layout (date left / weekday right / alert below clock)
+               is built so nothing overlaps at any value in this range.
+               ========================================================= */
+            --scale: 1;
+
+            /* clamp() keeps the clock between 250px and 700px no matter
+               how large/small you set --scale, so it can never overflow
+               the screen or crash into the date/weekday panels */
+            --clock-size: clamp(250px, calc(450px * var(--scale)), 700px);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Times New Roman', Times, serif;
+            overflow: hidden;
+            cursor: none; /* Hide cursor for screensaver mode */
+        }
+
+        /* Digital Space Background Canvas */
+        #space {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* ===================== LAYOUT ===================== */
+        /* Three-column row: DATE (left) | CLOCK (center) | WEEKDAY (right) */
+        .screensaver-content {
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: calc(60px * var(--scale));
+            z-index: 10;
+            animation: floatAround 45s ease-in-out infinite alternate;
+        }
+
+        @keyframes floatAround {
+            0%   { transform: translate(-3vw, -3vh); }
+            33%  { transform: translate(3vw, 1.5vh); }
+            66%  { transform: translate(-1.5vw, 3vh); }
+            100% { transform: translate(2vw, -2vh); }
+        }
+
+        /* Center column holds clock + alert stacked, so alert never collides with side panels */
+        .clock-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: calc(22px * var(--scale));
+        }
+
+        /* Side info panels (date / weekday) */
+        .side-panel {
+            text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            text-transform: uppercase;
+            min-width: calc(120px * var(--scale));
+            flex-shrink: 0;
+        }
+
+        .side-panel .label {
+            font-size: calc(0.75rem * var(--scale));
+            letter-spacing: calc(4px * var(--scale));
+            color: #5d7a8c;
+            margin-bottom: calc(10px * var(--scale));
+        }
+
+        .side-panel .value {
+            color: #00ffcc;
+            text-shadow: 0 0 calc(15px * var(--scale)) rgba(0, 255, 204, 0.45);
+            letter-spacing: calc(2px * var(--scale));
+            line-height: 1.3;
+        }
+
+        .date-panel .value {
+            font-size: calc(1.8rem * var(--scale));
+        }
+
+        .weekday-panel .value {
+            font-size: calc(1.7rem * var(--scale));
+        }
+
+        /* Status Alert Styling (Lunch and Punch Out) */
+        .status-alert {
+            display: none;
+            font-size: calc(1.5rem * var(--scale));
+            letter-spacing: calc(3px * var(--scale));
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            text-transform: uppercase;
+            animation: warning-flash 1s infinite alternate;
+            white-space: nowrap;
+        }
+
+        @keyframes warning-flash {
+            0% { opacity: 1; filter: drop-shadow(0 0 15px currentColor); }
+            100% { opacity: 0.4; filter: drop-shadow(0 0 2px currentColor); }
+        }
+
+        /* ===================== CLOCK ===================== */
+        .clock-container {
+            position: relative;
+            width: var(--clock-size);
+            height: var(--clock-size);
+            background: #1a0f02;
+            border-radius: 50%;
+            border: calc(4px * var(--scale)) solid #3a220f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            box-shadow:
+                0 0 50px rgba(0, 255, 255, 0.15),
+                0 0 100px rgba(0, 150, 255, 0.1),
+                inset 0 10px 20px rgba(255,255,255,0.05),
+                inset 0 -10px 20px rgba(0,0,0,0.8);
+
+            animation: pulse-glow 6s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 30px rgba(0, 200, 255, 0.1), inset 0 10px 20px rgba(255,255,255,0.1); }
+            100% { box-shadow: 0 0 70px rgba(0, 200, 255, 0.2), 0 0 120px rgba(0, 100, 255, 0.15), inset 0 10px 20px rgba(255,255,255,0.1); }
+        }
+
+        .clock-inner-rim {
+            position: absolute;
+            width: calc(var(--clock-size) * 0.889);
+            height: calc(var(--clock-size) * 0.889);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fcfaf0 60%, #e8e2c8 100%);
+            border: calc(8px * var(--scale)) solid #d4af37;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.3);
+        }
+
+        /* Custom EDC Branding */
+        .brand-text {
+            position: absolute;
+            top: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #222;
+            z-index: 10;
+        }
+
+        .brand-text .name {
+            font-size: calc(1.5rem * var(--scale));
+            font-weight: 700;
+            letter-spacing: calc(3px * var(--scale));
+            font-family: 'Cinzel', Arial, sans-serif;
+            color: #111;
+        }
+
+        .brand-text .location {
+            font-size: calc(1rem * var(--scale));
+            letter-spacing: calc(3px * var(--scale));
+            margin-top: calc(5px * var(--scale));
+            color: #2a2a2a;
+            font-family: Arial, sans-serif;
+        }
+
+        .number {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            font-size: calc(2.8rem * var(--scale));
+            font-weight: bold;
+            color: #0a0a0a;
+            padding-top: calc(15px * var(--scale));
+            z-index: 5;
+        }
+
+        .number span { display: inline-block; }
+
+        .tick {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .tick::before {
+            content: '';
+            position: absolute;
+            top: calc(12px * var(--scale));
+            left: 0;
+            width: 100%;
+            height: calc(10px * var(--scale));
+            background-color: #222;
+        }
+
+        /* Clock Hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom;
+            border-radius: 10px 10px 0 0;
+            z-index: 15;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+            transition: transform 0.05s cubic-bezier(0.4, 2.08, 0.55, 0.44);
+        }
+
+        .hour-hand { width: calc(10px * var(--scale)); height: calc(110px * var(--scale)); background: #111; margin-left: calc(-5px * var(--scale)); }
+        .minute-hand { width: calc(6px * var(--scale)); height: calc(160px * var(--scale)); background: #222; margin-left: calc(-3px * var(--scale)); }
+
+        .second-hand {
+            width: calc(2px * var(--scale)); height: calc(180px * var(--scale)); background: #d32f2f;
+            margin-left: calc(-1px * var(--scale)); z-index: 20;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+        }
+
+        .second-hand::after {
+            content: ''; position: absolute; top: 100%; left: 0;
+            width: calc(2px * var(--scale)); height: calc(40px * var(--scale)); background: #d32f2f;
+        }
+
+        .center-pin {
+            position: absolute; width: calc(20px * var(--scale)); height: calc(20px * var(--scale)); background: #d4af37;
+            border: calc(2px * var(--scale)) solid #111; border-radius: 50%; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 25;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        .glass-glare {
+            position: absolute; top: 2%; left: 2%; width: 96%; height: 96%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 45%);
+            pointer-events: none; z-index: 30;
+        }
+
+        /* One-time hint telling the viewer to click so the hourly chime can play
+           (browsers block sound until the page has been interacted with) */
+        .audio-hint {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            color: rgba(0, 255, 204, 0.55);
+            z-index: 50;
+            transition: opacity 0.8s ease;
+        }
+
+        .audio-hint.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ===================== SOUND TOGGLE ===================== */
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: rgba(20, 25, 35, 0.55);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: background 0.2s ease, border-color 0.2s ease, opacity 0.5s ease;
+            /* Hidden by default for a clean screensaver look — fades in near the corner */
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sound-toggle.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(0, 255, 204, 0.15);
+        }
+
+        .sound-toggle svg {
+            width: 22px;
+            height: 22px;
+            stroke: #00ffcc;
+            fill: none;
+            stroke-width: 1.8;
+        }
+
+        /* When muted, dim the icon and show a strike-through line */
+        .sound-toggle.muted {
+            border-color: rgba(255, 100, 100, 0.35);
+        }
+
+        .sound-toggle.muted svg {
+            stroke: #ff8a8a;
+            opacity: 0.85;
+        }
+
+        .sound-toggle .mute-line {
+            display: none;
+        }
+
+        .sound-toggle.muted .mute-line {
+            display: block;
+        }
+
+        /* Small status label that appears briefly under the gear when toggled */
+        .sound-status {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 1.5px;
+            color: rgba(0, 255, 204, 0.7);
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            text-align: right;
+        }
+
+        .sound-status.show {
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="space"></canvas>
+
+    <div class="screensaver-content">
+
+        <div class="side-panel date-panel">
+            <div class="label">Date</div>
+            <div class="value" id="dateValue">00.00.0000</div>
+        </div>
+
+        <div class="clock-column">
+            <div class="clock-container">
+                <div class="clock-inner-rim" id="clockFace">
+                    <div class="glass-glare"></div>
+                    <div class="brand-text">
+                        <div class="name">EDC</div>
+                        <div class="location">SIDDHARTHNAGAR</div>
+                    </div>
+                    <div class="hand hour-hand" id="hour"></div>
+                    <div class="hand minute-hand" id="minute"></div>
+                    <div class="hand second-hand" id="second"></div>
+                    <div class="center-pin"></div>
+                </div>
+            </div>
+            <div class="status-alert" id="statusAlert"></div>
+        </div>
+
+        <div class="side-panel weekday-panel">
+            <div class="label">Day</div>
+            <div class="value" id="weekdayValue">SUNDAY</div>
+        </div>
+
+    </div>
+
+    <div class="audio-hint" id="audioHint">CLICK ANYWHERE TO ENABLE CLOCK SOUNDS</div>
+
+    <!-- Sound on/off toggle — independent from clock size, which stays CSS-only -->
+    <div class="sound-toggle" id="soundToggle" title="Toggle tick-tock and hourly chime">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 9 7 9 11 5 11 19 7 15 3 15 3 9"></polygon>
+            <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+            <path d="M18 6a9 9 0 0 1 0 12"></path>
+            <line class="mute-line" x1="2" y1="2" x2="22" y2="22"></line>
+        </svg>
+    </div>
+    <div class="sound-status" id="soundStatus">SOUND ON</div>
+
+    <script>
+        // Digital Space Background Logic
+        const canvas = document.getElementById('space');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let stars = [];
+        const NUM_STARS = 350;
+        const SPEED = 0.4;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        for (let i = 0; i < NUM_STARS; i++) {
+            stars.push({
+                x: Math.random() * width * 2 - width,
+                y: Math.random() * height * 2 - height,
+                z: Math.random() * width
+            });
+        }
+
+        function animateSpace() {
+            ctx.fillStyle = 'rgba(2, 3, 8, 0.4)';
+            ctx.fillRect(0, 0, width, height);
+
+            const cx = width / 2;
+            const cy = height / 2;
+
+            stars.forEach(star => {
+                star.z -= SPEED;
+
+                if (star.z <= 0) {
+                    star.z = width;
+                    star.x = Math.random() * width * 2 - width;
+                    star.y = Math.random() * height * 2 - height;
+                }
+
+                const px = cx + (star.x / star.z) * cx;
+                const py = cy + (star.y / star.z) * cx;
+                const size = Math.max(0, (1 - star.z / width) * 2.2);
+
+                ctx.fillStyle = 'rgba(150, 200, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(animateSpace);
+        }
+        animateSpace();
+
+        // Classic Clock Logic
+        const clockFace = document.getElementById('clockFace');
+
+        for (let i = 1; i <= 12; i++) {
+            let numDiv = document.createElement('div');
+            numDiv.className = 'number';
+            numDiv.style.transform = `rotate(${i * 30}deg)`;
+            let spanDiv = document.createElement('span');
+            spanDiv.style.transform = `rotate(-${i * 30}deg)`;
+            spanDiv.innerText = i;
+            numDiv.appendChild(spanDiv);
+            clockFace.appendChild(numDiv);
+        }
+
+        for (let i = 0; i < 60; i++) {
+            if (i % 5 !== 0) {
+                let tickDiv = document.createElement('div');
+                tickDiv.className = 'tick';
+                tickDiv.style.transform = `rotate(${i * 6}deg)`;
+                clockFace.appendChild(tickDiv);
+            }
+        }
+
+        const hourHand = document.getElementById('hour');
+        const minuteHand = document.getElementById('minute');
+        const secondHand = document.getElementById('second');
+        const dateValue = document.getElementById('dateValue');
+        const weekdayValue = document.getElementById('weekdayValue');
+        const statusAlert = document.getElementById('statusAlert');
+
+        // ===================== SOUND ON/OFF STATE =====================
+        // Controls BOTH the per-second tick-tock AND the hourly pendulum chime.
+        // Preference is remembered across reloads via localStorage.
+        let soundEnabled = localStorage.getItem('edc_clock_sound') !== 'off'; // default ON
+
+        // ===================== HOURLY PENDULUM CHIME =====================
+        // Synthesized grandfather-clock "bong" — no audio file needed.
+        // Strikes once per hour count (e.g. 3 bongs at 3 o'clock, 12 at noon/midnight).
+        let audioCtx = null;
+        let lastChimedHour = -1; // prevents repeating the chime within the same hour
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        // A single deep bell "bong" — layered tones to sound like a resonant pendulum clock bell
+        function playBong(startTime) {
+            const ctx = getAudioContext();
+
+            // Core bell tones (a fundamental + a couple of inharmonic overtones,
+            // which is what makes a struck bell sound metallic rather than a pure beep)
+            const partials = [
+                { freq: 220,  gain: 0.5, decay: 2.2 },
+                { freq: 330,  gain: 0.28, decay: 1.8 },
+                { freq: 554,  gain: 0.16, decay: 1.3 },
+                { freq: 740,  gain: 0.09, decay: 0.9 }
+            ];
+
+            partials.forEach(p => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(p.freq, startTime);
+
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(p.gain, startTime + 0.015); // soft strike attack
+                gain.gain.exponentialRampToValueAtTime(0.0001, startTime + p.decay); // long bell decay
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(startTime);
+                osc.stop(startTime + p.decay + 0.1);
+            });
+
+            // A very brief "strike" click at the start, like the hammer hitting metal
+            const clickOsc = ctx.createOscillator();
+            const clickGain = ctx.createGain();
+            clickOsc.type = 'triangle';
+            clickOsc.frequency.setValueAtTime(900, startTime);
+            clickGain.gain.setValueAtTime(0.12, startTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.08);
+            clickOsc.connect(clickGain);
+            clickGain.connect(ctx.destination);
+            clickOsc.start(startTime);
+            clickOsc.stop(startTime + 0.1);
+        }
+
+        // Plays N bongs spaced like a real pendulum clock strike sequence
+        function playHourChime(hour) {
+            if (!soundEnabled) return; // respect the mute toggle
+            const ctx = getAudioContext();
+            if (ctx.state === 'suspended') ctx.resume();
+
+            let strikes = hour % 12;
+            if (strikes === 0) strikes = 12; // 12 PM / 12 AM both strike twelve
+
+            const strikeGap = 1.4; // seconds between each bong
+            const now = ctx.currentTime;
+
+            for (let i = 0; i < strikes; i++) {
+                playBong(now + i * strikeGap);
+            }
+        }
+
+        // ===================== PENDULUM TICK-TOCK =====================
+        // A soft mechanical "tick" / "tock" on every second, alternating like
+        // a real pendulum swinging left-right. Two short filtered clicks at
+        // slightly different pitches give the tick/tock distinction.
+        let tickIsEven = true;
+
+        function playTick(startTime, isTick) {
+            const ctx = getAudioContext();
+
+            // A short, soft, woody click — band-passed noise burst rather than a tone,
+            // which is what makes it sound mechanical instead of like a beep.
+            const bufferSize = Math.floor(ctx.sampleRate * 0.05);
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // decaying noise
+            }
+
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(isTick ? 1400 : 1000, startTime); // tick = slightly higher than tock
+            filter.Q.setValueAtTime(2.2, startTime);
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.05, startTime); // kept gentle/soft as requested
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.06);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            noise.start(startTime);
+            noise.stop(startTime + 0.07);
+        }
+
+        function playTickTock() {
+            if (!soundEnabled) return; // respect the mute toggle
+            if (!audioCtx) return; // stay silent until the viewer has interacted with the page
+            const ctx = getAudioContext();
+            if (ctx.state === 'suspended') return;
+            playTick(ctx.currentTime, tickIsEven);
+            tickIsEven = !tickIsEven;
+        }
+
+        // Browsers block audio until the user interacts with the page at least once.
+        // This unlocks the AudioContext on the first click/tap/keypress.
+        function unlockAudioOnce() {
+            getAudioContext();
+            const hint = document.getElementById('audioHint');
+            if (hint) hint.classList.add('hidden');
+            window.removeEventListener('click', unlockAudioOnce);
+            window.removeEventListener('keydown', unlockAudioOnce);
+            window.removeEventListener('touchstart', unlockAudioOnce);
+        }
+        window.addEventListener('click', unlockAudioOnce);
+        window.addEventListener('keydown', unlockAudioOnce);
+        window.addEventListener('touchstart', unlockAudioOnce);
+
+        // ===================== SOUND TOGGLE GEAR =====================
+        const soundToggle = document.getElementById('soundToggle');
+        const soundStatus = document.getElementById('soundStatus');
+        let statusFadeTimer = null;
+
+        function refreshSoundIcon() {
+            soundToggle.classList.toggle('muted', !soundEnabled);
+            soundToggle.title = soundEnabled
+                ? 'Sound ON — click to mute tick-tock and hourly chime'
+                : 'Sound OFF — click to enable tick-tock and hourly chime';
+        }
+
+        function showSoundStatus() {
+            soundStatus.innerText = soundEnabled ? 'SOUND ON' : 'SOUND OFF';
+            soundStatus.classList.add('show');
+            clearTimeout(statusFadeTimer);
+            statusFadeTimer = setTimeout(() => {
+                soundStatus.classList.remove('show');
+            }, 1800);
+        }
+
+        soundToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); // don't let this click also trigger unlockAudioOnce twice
+            getAudioContext(); // also unlocks audio if this is the very first click
+            const hint = document.getElementById('audioHint');
+            if (hint) hint.classList.add('hidden');
+
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('edc_clock_sound', soundEnabled ? 'on' : 'off');
+            refreshSoundIcon();
+            showSoundStatus();
+            showGear(); // keep it visible a moment longer so the new state is seen
+        });
+
+        // Set correct icon state on page load (respects saved preference)
+        refreshSoundIcon();
+
+        // ===================== AUTO-HIDE GEAR (cursor-aware) =====================
+        // Keeps the screen clean: the gear stays invisible until the mouse moves
+        // into the top-right corner, then fades back out after 2.5s of inactivity.
+        const CORNER_ZONE_SIZE = 140; // px from the top-right corner that counts as "near the gear"
+        let gearHideTimer = null;
+
+        function showGear() {
+            soundToggle.classList.add('visible');
+            clearTimeout(gearHideTimer);
+            gearHideTimer = setTimeout(() => {
+                soundToggle.classList.remove('visible');
+            }, 2500);
+        }
+
+        function hideGearNow() {
+            clearTimeout(gearHideTimer);
+            soundToggle.classList.remove('visible');
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const nearCorner =
+                e.clientX > window.innerWidth - CORNER_ZONE_SIZE &&
+                e.clientY < CORNER_ZONE_SIZE;
+
+            if (nearCorner) {
+                showGear();
+            } else {
+                // Mouse moved elsewhere — let any pending hide timer run its course
+                // rather than snapping the gear away instantly mid-hover.
+            }
+        });
+
+        // Touch screens: a tap near the corner reveals it the same way
+        window.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            if (!touch) return;
+            const nearCorner =
+                touch.clientX > window.innerWidth - CORNER_ZONE_SIZE &&
+                touch.clientY < CORNER_ZONE_SIZE;
+            if (nearCorner) showGear();
+        });
+
+        function updateClock() {
+            const now = new Date();
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes();
+            const hours = now.getHours();
+
+            const secondsDegrees = seconds * 6;
+            const minutesDegrees = (minutes * 6) + (seconds * 0.1);
+            const hoursDegrees = ((hours % 12) * 30) + (minutes * 0.5);
+
+            if (seconds === 0) {
+                secondHand.style.transition = 'none';
+            } else {
+                secondHand.style.transition = 'transform 0.05s cubic-bezier(0.4, 2.08, 0.55, 0.44)';
+            }
+
+            secondHand.style.transform = `rotate(${secondsDegrees}deg)`;
+            minuteHand.style.transform = `rotate(${minutesDegrees}deg)`;
+            hourHand.style.transform = `rotate(${hoursDegrees}deg)`;
+
+            // Soft mechanical tick-tock, once per second
+            playTickTock();
+
+            // Date (left) and Weekday (right), shown separately
+            const dayName = now.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+            const dayStr = String(now.getDate()).padStart(2, '0');
+            const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+            const yearStr = now.getFullYear();
+
+            dateValue.innerText = `${dayStr}.${monthStr}.${yearStr}`;
+            weekdayValue.innerText = dayName;
+
+            // --- Hourly Chime Trigger ---
+            // Fires once, right at minute 0 / second 0 of every hour
+            if (minutes === 0 && seconds === 0 && lastChimedHour !== hours) {
+                lastChimedHour = hours;
+                playHourChime(hours);
+            }
+
+            // --- Multi-Condition Alert Logic ---
+            if (hours === 14) {
+                statusAlert.innerText = "LUNCH TIME!";
+                statusAlert.style.color = "#ffcc00";
+                statusAlert.style.display = 'block';
+            } else if (hours >= 17 && hours <= 23) {
+                statusAlert.innerText = "DON'T FORGET TO PUNCH OUT!";
+                statusAlert.style.color = "#ff4d4d";
+                statusAlert.style.display = 'block';
+            } else {
+                statusAlert.style.display = 'none';
+            }
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+    </script>
+
+</body>
+</html>
