@@ -616,7 +616,7 @@
             filter.Q.setValueAtTime(2.2, startTime);
 
             const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.05, startTime); // kept gentle/soft as requested
+            gain.gain.setValueAtTime(0.1, startTime); // kept gentle/soft as requested
             gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.06);
 
             noise.connect(filter);
